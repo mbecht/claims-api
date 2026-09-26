@@ -21,9 +21,7 @@ Java 25 · Spring Boot 4.1 · Maven · PostgreSQL 17 · Docker Compose · JUnit 
 **Prerequisites:** JDK 25, Docker Desktop
 
 1. Clone the repository
-```
 2. Copy the environment template and set a password
-```
 3. Start the app and database
 ```bash
    docker compose up --build
