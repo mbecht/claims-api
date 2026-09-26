@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: claims-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claims}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized

@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
+This project is a Spring Boot REST API that takes an insurance claim from submission to payout, enforcing business rules, role-based permissions and a full audit trail.
+The user case example is that an insurer needs a backend service where policyholders file claims, adjusters review them, and supervisors handle high-value or suspicious cases. Every change must be traceable for auditors.
+This is an educational project so the claims, users, and data are all fictional.
+
 This is a portfolio project to demonstrate my (the user) understanding of the tech stack and working alongside AI. 
 I must understand every change. Explain what you did and why after each task.
 
