@@ -32,6 +32,20 @@ Java 25 · Spring Boot 4.1 · Maven · PostgreSQL 17 · Docker Compose · JUnit 
    # {"status":"UP"}
 ```
 
+## Local development accounts
+
+> [!WARNING]
+> These accounts are created by dev-only seed data and exist **only in your local Docker database**. They are never loaded in tests or production.
+
+| Username | Role | Used to test |
+|---|---|---|
+| 'alice' | Policyholder | Submitting and viewing her own claims |
+| 'bob' | Policyholder | Access control test |
+| 'carol' | Adjuster | Reviewing claims up to $10,000 |
+| 'dave' | Supervisor | Approving claims over $10,000 |
+
+Seed data lives in 'src/main/resources/db/dev-data/' and runs only when the 'dev' profile is active.
+
 ## Running tests
 ```bash
 ./mvnw verify
@@ -40,14 +54,13 @@ Docker must be running; tests start a temporary Postgres container.
 
 ## Architecture
 The app will run in one container with Postgre in another, connected by Docker Compose.
-**TODO:** A diagram will be added as the project grows.
 
 ## Design decisions
 See [docs/decisions](docs/decisions/) for the reasoning behind key choices.
 
 ## Roadmap
 - [x] Project skeleton, Docker, CI
-- [ ] Database schema and migrations
+- [x] Database schema and migrations
 - [ ] Claim submission and validation
 - [ ] Authentication and role-based access
 - [ ] Claim workflow and approval limits
