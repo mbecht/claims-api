@@ -25,8 +25,8 @@ public class Claim {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "claim_number", nullable = false, unique = true)
-    private Integer claimNumber;
+    @Column(name = "claim_number", nullable = false, unique = true, length = 20)
+    private String claimNumber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "policy_id", nullable = false)
@@ -56,7 +56,7 @@ public class Claim {
     protected Claim() {
     }
 
-    public Claim(Integer claimNumber, Policy policy, LocalDateTime incidentDate, BigDecimal amount, String description) {
+    public Claim(String claimNumber, Policy policy, LocalDateTime incidentDate, BigDecimal amount, String description) {
         this.claimNumber = claimNumber;
         this.policy = policy;
         this.incidentDate = incidentDate;
@@ -69,7 +69,7 @@ public class Claim {
         return id;
     }
 
-    public Integer getClaimNumber() {
+    public String getClaimNumber() {
         return claimNumber;
     }
 
