@@ -3,7 +3,7 @@
 **Date:** 2026-09-26
 **Status:** Accepted
 
-# Context
+## Context
 The project needed a build tool to manage dependencies and run tests. 
 The app should be able to run locally with a PostgreSQL database from one command.
 

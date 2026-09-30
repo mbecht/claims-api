@@ -3,12 +3,12 @@
 **Date:** 2026-09-27
 **Status:** Accepted
 
-# Context
-Seperate paths were created to store database migrations and dev-data changes.
-Dev seed data is kept seperate from migrations so it will only load on the dev profile and has no risk of entering production enviornment.
+## Context
+Separate paths were created to store database migrations and dev-data changes.
+Dev seed data is kept separate from migrations so it will only load on the dev profile and has no risk of entering production environment.
 
 ## Decision
-Flyway manages database schema changes with new versions for each change so that multiple users have access to a synched and validated schema.
+Flyway manages database schema changes with new versions for each change so that multiple users have access to an in-sync and validated schema.
 
 ## Alternatives considered
 **Hibernate auto-DDL** - It generates schema changes at runtime by inspecting diff, but it does not store version records of what changed each time, and when changes were made.
