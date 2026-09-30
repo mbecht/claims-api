@@ -85,6 +85,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ProblemDetail problem = newProblemDetail(
                 HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST, "The request body could not be read.");
+        problem.setProperty("errors", List.of(new FieldValidationError("requestBody", "Malformed JSON request")));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }
