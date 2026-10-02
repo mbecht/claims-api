@@ -5,7 +5,7 @@
 This personal project is a demonstration of a Spring Boot REST API that could be used for enterprise insurance software needs.
 The backend service takes a mock insurance claim from submission to payout, enforcing business rules, role-based permissions and a full audit trail.
 
-> **Status:** In progress - Story 4 of 17 complete
+> **Status:** In progress - Story 5 of 17 complete
 
 ## What this project demonstrates
 - Domain modeling
@@ -92,7 +92,9 @@ All errors return a consistent JSON body following the [RFC 9457 Problem Details
 | `MALFORMED_REQUEST` | 400 | The request body isn't valid JSON or has the wrong types | Text sent where a number is expected |
 | `CLAIM_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown claim ID |
 | `ILLEGAL_STATUS_TRANSITION` | 409 | The request conflicts with the item's current state | Moving a claim from Submitted straight to Paid |
-| `BUSINESS_RULE_VIOLATION` | 422 | The request is valid but breaks a business rule | Filing a claim on an expired policy |
+| `POLICY_NOT_YET_ACTIVE` | 422 | The request is valid but breaks a business rule | Filing a claim on a policy that has not started yet |
+| `POLICY_EXPIRED` | 422 | The request is valid but breaks a business rule | Filing a claim on an expired policy |
+| `CLAIM_AMOUNT_EXCEEDS_POLICY_LIMIT` | 422 | The request is valid but breaks a business rule | Filing a claim with an amount over the policy coverage limit |
 | `INTERNAL_ERROR` | 500 | Unexpected server error | Database unavailable |
 
 > [!NOTE]
@@ -112,7 +114,7 @@ See [docs/decisions](docs/decisions/) for the reasoning behind key choices.
 - [x] Database schema and migrations
 - [x] Consistent error responses
 - [x] Claim submission
-- [ ] Coverage validation
+- [x] Coverage validation
 - [ ] View and search claims
 - [ ] Login with token
 - [ ] Role-based access
