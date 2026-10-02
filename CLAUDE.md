@@ -17,29 +17,46 @@ Never commit or push. I do all Git operations myself.
 
 Tech stack: Java 25, Spring Boot 4.1, Maven, PostgreSQL, JUnit5, Testcontainers.
 
+## Business Rules
+
+We need to establish and maintain business rules and coverage criteria for this fictional insurance company.
+Every policy requires a policy number. Every policy has a one year duration.
+An incident or claim must occur on or after the coverage start date.
+An incident or claim must occur on or before the coverage end date (compare by truncating the incident timestamp to a date first).
+An expired policy can still accept a claim so long as the recorded incident date occurred while the policy was still active — expiration alone is not a rejection reason; only the incident-date-vs-coverage-period check is.
+The claim amount must not exceed the coverage limit amount; an amount equal to the limit is valid.
+
+## Backlog (business rules out of scope for story 5)
+
+- Cumulative/aggregate claim exposure — nothing stops multiple claims against one policy from each individually passing the coverage-limit check but together exceeding it. Story 5 checks each claim's amount against the limit in isolation; aggregate tracking is a different rule, likely tied to the fraud-flagging work in story 13.
+- Policy cancellation/lapse as a distinct state — "expired" currently only means past `coverage_end` (date-driven). There's no way to represent a policy cancelled mid-term (non-payment, fraud, policyholder request). Would need a `status` column and its own rule set if ever wanted.
+- Policy renewal semantics — whether a renewed policy reuses its `policy_number` or gets a new one (the schema currently treats `policy_number` as unique forever). Not urgent until a create/renew-policy endpoint exists.
+- Validation error precedence — which error should win when a request violates more than one rule at once. Not a concern yet with only two independent checks in story 5, but worth a one-line convention once more rules stack up.
+
 ## User Stories
 
 Seventeen stories in six phases. Each phase builds on the one before, so finish and test one before starting the next. Tick acceptance criteria as they pass.
 Phase 1 — Foundation
 1. Runnable project skeleton. As a developer, I want a Spring Boot app and Postgres that start with one command, so every feature builds on a working base.
-[ ] docker compose up starts the app and database
-[ ] GET /actuator/health returns 200
-[ ] GitHub Actions builds and runs tests on every push
+[x] docker compose up starts the app and database
+[x] GET /actuator/health returns 200
+[x] GitHub Actions builds and runs tests on every push
 2. Database schema and migrations. As a developer, I want the schema managed by Flyway, so database changes are versioned and repeatable.
-[ ] Migrations create policies, claims and users tables
-[ ] Seed data adds sample policies (active and expired) and users for each role
-[ ] A Testcontainers test confirms migrations run on a clean Postgres
+[x] Migrations create policies, claims and users tables
+[x] Seed data adds sample policies (active and expired) and users for each role
+[x] A Testcontainers test confirms migrations run on a clean Postgres
 3. Consistent error responses. As an API consumer, I want every error in the same format, so failures are predictable to handle.
-[ ] A global exception handler returns status, error code, message and timestamp
-[ ] Validation errors list each invalid field
-[ ] 400, 404 and 409 cases are covered by tests
+[x] A global exception handler returns status, error code, message and timestamp
+[x] Validation errors list each invalid field
+[x] 400, 404 and 409 cases are covered by tests
 Phase 2 — Core claims
 4. Submit a claim. As a policyholder, I want to file a claim with my policy number, incident date, amount and description, so I can request reimbursement.
-[ ] POST /api/claims creates a claim with status Submitted and returns 201
-[ ] Missing or invalid fields (negative amount, future date) return 400
+[x] POST /api/claims creates a claim with status Submitted and returns 201
+[x] Missing or invalid fields (negative amount, future date) return 400
 5. Validate coverage. As the insurer, I want claims checked against the policy, so we never accept a claim we don't cover.
-[ ] Unknown policy → 404; expired policy → 422 with a clear message
-[ ] Incident date outside the coverage period is rejected
+[ ] Unknown policy → 404
+[ ] Incident date outside the coverage period (coverage start through coverage end, inclusive; compare by truncating the incident timestamp to a date) → 422 — an expired policy is not itself a rejection reason
+[ ] Claim amount exceeding the policy's coverage limit → 422; an amount equal to the limit is valid
 [ ] Unit tests cover each rule, written before implementation
 6. View and search claims. As a user, I want to see a claim's details and a filtered list of claims, so I can track their progress.
 [ ] GET /api/claims/{id} returns full claim details
@@ -99,8 +116,23 @@ The project is ready to showcase when all of these are true:
 
 ## Project state
 
-This is a Spring Boot project generated from Spring Initializr and is currently a bare skeleton — no controllers,
-entities, repositories, or business logic have been added yet. The base package is `com.mbecht.claims_api`.
+Stories 1–4 are complete: project skeleton/Docker/CI, Flyway-managed schema with dev-only seed data, a global
+RFC 9457 exception handler, and the claim submission endpoint. The base package is `com.mbecht.claims_api`,
+organized as:
+
+- `controller` — `ClaimController` (`POST /api/claims`)
+- `dto` — `SubmitClaimRequest`, `ClaimResponse`
+- `entity` — `Claim`, `Policy`, `User`, `Role`, `ClaimStatus`
+- `repository` — `ClaimRepository`, `PolicyRepository`
+- `service` — `ClaimService`, `ClaimNumberGenerator`
+- `exception` — `GlobalExceptionHandler`, `ErrorCode`, `ResourceNotFoundException`, `ConflictException`, `BusinessRuleException`
+
+`ClaimService.submitClaim` currently only checks that the referenced policy exists (404 if not) — it does not yet
+check whether the incident date falls within the coverage period or whether the claim amount exceeds the coverage
+limit. That's the remaining scope of story 5; the "unknown policy → 404" criterion is already satisfied.
+
+Sample request payloads for manual testing live in `requests/` at the repo root (not under `src/`, since they're
+dev tooling, not part of the build).
 
 ## Commands
 
@@ -123,20 +155,33 @@ This project uses the Maven wrapper (`mvnw`/`mvnw.cmd`) — no need for a locall
 # Run a single test method
 ./mvnw.cmd test -Dtest=ClaimsApiApplicationTests#contextLoads
 
-# Run the app locally against the dev Testcontainers Postgres instance
-./mvnw.cmd test-run          # invokes TestClaimsApiApplication (see below)
+# Run the app locally against an ephemeral Testcontainers Postgres instance
+# (separate container/database from docker compose — see Architecture below).
+# Requires Docker Desktop running. Set the dev profile first to load seed data:
+$env:SPRING_PROFILES_ACTIVE = "dev"    # PowerShell
+./mvnw.cmd spring-boot:test-run        # invokes TestClaimsApiApplication (see below)
 ```
 
 ## Architecture
 
 - **Java 25**, Spring Boot 4.1.1 (`spring-boot-starter-parent`).
-- Dependencies: `web` (Spring MVC), `data-jpa`, `validation`, `actuator`, PostgreSQL driver (runtime), plus
-  Testcontainers-based equivalents for each starter in test scope.
-- **Database**: PostgreSQL via Spring Data JPA. No datasource is configured in `application.properties` for local/dev
-  runs — instead, `TestcontainersConfiguration` (in `src/test`) spins up a `postgres:latest` Testcontainers instance
-  and wires it in automatically via `@ServiceConnection`. `TestClaimsApiApplication.main()` boots the full app with
-  that Testcontainers config applied, which is the standard way to run the app locally during development (Spring
-  Boot's Testcontainers-at-development-time support — see `HELP.md`). Production deployments will need a real
-  datasource configured via `application.properties`/environment/profile once one exists.
+- Dependencies: `webmvc` (Spring MVC), `data-jpa`, `flyway` + `flyway-database-postgresql`, `validation`, `actuator`,
+  PostgreSQL driver (runtime), plus Testcontainers-based equivalents for each starter in test scope.
+- **Database**: PostgreSQL via Spring Data JPA, schema managed by Flyway (ADR 0002). Migrations live in
+  `src/main/resources/db/migration`; dev-only seed data lives in a separate `db/dev-data` location that's only
+  added to Flyway's search path when the `dev` Spring profile is active (`application-dev.yml`), so it never runs
+  in tests or production.
+- **Two separate ways to run against Postgres locally — they use different, non-interchangeable databases:**
+  - `docker compose up --build` — the app plus a **persistent** Postgres (`docker-compose.yml`, named volume,
+    database `claims`, credentials from `.env`) as two containers (ADR 0001). The production-like path.
+  - `./mvnw.cmd spring-boot:test-run` — boots `TestClaimsApiApplication`, which applies `TestcontainersConfiguration`
+    (`src/test`) to spin up a **fresh, ephemeral** `postgres:latest` container every run via `@ServiceConnection`
+    (database/user/password default to `test`; data doesn't survive past the run). This is Spring Boot's
+    Testcontainers-at-development-time support (see `HELP.md`) — fast local iteration, not a substitute for the
+    docker-compose path. Production deployments will need a real datasource configured via environment/profile.
+- **Error handling**: a single `@RestControllerAdvice` (`GlobalExceptionHandler`) translates exceptions into
+  RFC 9457 Problem Details responses with an added `errorCode` and `timestamp` extension property (ADR 0003).
+- **Request/response shape**: controllers accept and return DTOs (`dto` package), never JPA entities directly, so
+  the wire format stays decoupled from the persistence model (ADR 0004).
 - Main entry point: `ClaimsApiApplication` (`src/main/java/com/mbecht/claims_api/ClaimsApiApplication.java`).
 - Test entry point for local dev runs: `TestClaimsApiApplication` (`src/test/java/com/mbecht/claims_api/TestClaimsApiApplication.java`).
