@@ -23,11 +23,11 @@ Java 25 · Spring Boot 4.1 · Maven · PostgreSQL 17 · Docker Compose · JUnit 
 1. Clone the repository
 2. Copy the environment template and set a password
 3. Start the app and database
-```bash
+```powershell
    docker compose up --build
 ```
 4. Check that it's running
-```bash
+```powershell
    curl http://localhost:8080/actuator/health
    # {"status":"UP"}
 ```
@@ -47,7 +47,7 @@ Java 25 · Spring Boot 4.1 · Maven · PostgreSQL 17 · Docker Compose · JUnit 
 Seed data lives in 'src/main/resources/db/dev-data/' and runs only when the 'dev' profile is active.
 
 ## Running tests
-```bash
+```powershell
 ./mvnw verify
 ```
 Docker must be running; tests start a temporary Postgres container.
@@ -72,15 +72,61 @@ The following POST body ([requests/submit-claim.json](requests/submit-claim.json
 }
 ```
 
-The following POST request writes to a differente Postgres instsance than Docker. The difference is a persistent claims DB vs. a ephemeral Testcontainers test DB.
+The following POST request writes to a different Postgres instance than Docker. The difference is a persistent claims DB vs. a ephemeral Testcontainers test DB.
 
-```bash
+```powershell
 curl.exe -i -X POST http://localhost:8080/api/claims `
  -H "Content-Type: application/json" `
- -d "requests\submit-claim.json"
+ -d "@requests/submit-claim.json"
 ```
 
 A valid POST will print response headers with 201 status and a body that verifies "status":"SUBMITTED". The claims table on same Postgres instance will record the new claim record.
+
+## API GET Endpoints
+
+Users can read claims either by searching a specific ID or returning a list of all claims that accept optional filters. The goal of these endpoints is to demonstrate paging a large result set safely and effectively.
+
+Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong data type (ex: status=1). If the value is the correct type but outside the valid range, then it will return a 400 (VALIDATION_FAILED) code (ex: size=0).
+
+> [!WARNING]
+> Authentication is not currently implemented. Until that time (user stories 7 and 8), anyone can read any claim.
+
+| Request | Behavior|
+|---|---|
+| GET /api/claims/{id} | Returns claim details (id, claimNumber, policyNumber, incidentDate, amount, description, status, submittedAt) | 
+| GET /api/claims | Returns a page of claim summaries sorted by newest first |
+
+| Optional Parameter | Default | Allowed values | Description |
+|---|---|---|---|
+| ?status= | n/a | SUBMITTED, UNDER_REVIEW, APPROVED, DENIED, PAID | Filters claims by status. |
+| ?page= | 0 | Integers 0 and above | Page is zero-based. |
+| ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. |
+| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Sort by one or more fields (ex: ?sort=amount,desc&incidentDate,asc). |
+
+The following is an example GET request:
+
+```powershell
+curl.exe -i `
+  "http://localhost:8080/api/claims?status=SUBMITTED&page=0&size=20"
+```
+
+The following is a sample GET response:
+
+```json
+{
+  "content": 
+  [ 
+    { "id": 1, "claimNumber": "CLM-2026-000001", "policyNumber": 1001, "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, 
+    "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED",  "submittedAt": "2026-09-21T12:25:00" },
+    { "id": 2, "claimNumber": "CLM-2026-000002", "policyNumber": 1002, "incidentDate": "2026-09-22T10:30:00", "amount": 500.00, 
+    "description": "Side mirror damage", "status": "SUBMITTED",  "submittedAt": "2026-09-24T11:45:00" }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 2,
+  "totalPages": 1
+}
+```
 
 ## Error responses
 

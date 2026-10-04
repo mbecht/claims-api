@@ -54,10 +54,10 @@ Phase 2 — Core claims
 [x] POST /api/claims creates a claim with status Submitted and returns 201
 [x] Missing or invalid fields (negative amount, future date) return 400
 5. Validate coverage. As the insurer, I want claims checked against the policy, so we never accept a claim we don't cover.
-[ ] Unknown policy → 404
-[ ] Incident date outside the coverage period (coverage start through coverage end, inclusive; compare by truncating the incident timestamp to a date) → 422 — an expired policy is not itself a rejection reason
-[ ] Claim amount exceeding the policy's coverage limit → 422; an amount equal to the limit is valid
-[ ] Unit tests cover each rule, written before implementation
+[x] Unknown policy → 404
+[x] Incident date outside the coverage period (coverage start through coverage end, inclusive; compare by truncating the incident timestamp to a date) → 422 — an expired policy is not itself a rejection reason
+[x] Claim amount exceeding the policy's coverage limit → 422; an amount equal to the limit is valid
+[x] Unit tests cover each rule, written before implementation
 6. View and search claims. As a user, I want to see a claim's details and a filtered list of claims, so I can track their progress.
 [ ] GET /api/claims/{id} returns full claim details
 [ ] GET /api/claims supports filtering by status and paging
@@ -116,20 +116,23 @@ The project is ready to showcase when all of these are true:
 
 ## Project state
 
-Stories 1–4 are complete: project skeleton/Docker/CI, Flyway-managed schema with dev-only seed data, a global
-RFC 9457 exception handler, and the claim submission endpoint. The base package is `com.mbecht.claims_api`,
-organized as:
+Stories 1–5 are complete: project skeleton/Docker/CI, Flyway-managed schema with dev-only seed data, a global
+RFC 9457 exception handler, the claim submission endpoint, and coverage validation against the policy. The base
+package is `com.mbecht.claims_api`, organized as:
 
 - `controller` — `ClaimController` (`POST /api/claims`)
 - `dto` — `SubmitClaimRequest`, `ClaimResponse`
 - `entity` — `Claim`, `Policy`, `User`, `Role`, `ClaimStatus`
 - `repository` — `ClaimRepository`, `PolicyRepository`
-- `service` — `ClaimService`, `ClaimNumberGenerator`
+- `service` — `ClaimService`, `ClaimNumberGenerator`, `CoverageValidator`
 - `exception` — `GlobalExceptionHandler`, `ErrorCode`, `ResourceNotFoundException`, `ConflictException`, `BusinessRuleException`
 
-`ClaimService.submitClaim` currently only checks that the referenced policy exists (404 if not) — it does not yet
-check whether the incident date falls within the coverage period or whether the claim amount exceeds the coverage
-limit. That's the remaining scope of story 5; the "unknown policy → 404" criterion is already satisfied.
+`ClaimService.submitClaim` looks up the policy (404 via `ResourceNotFoundException` if unknown), then delegates to
+`CoverageValidator.validate` to check the incident date against the coverage period and the claim amount against
+the coverage limit, each violation raising a `BusinessRuleException` (422) with its own `ErrorCode`
+(`POLICY_EXPIRED`, `POLICY_NOT_YET_ACTIVE`, `CLAIM_AMOUNT_EXCEEDS_POLICY_LIMIT`). `CoverageValidatorTest` covers the
+three rules and their inclusive boundaries in isolation; `ClaimsServiceTest` covers the service's own orchestration
+(policy lookup, claim number generation, persistence).
 
 Sample request payloads for manual testing live in `requests/` at the repo root (not under `src/`, since they're
 dev tooling, not part of the build).
