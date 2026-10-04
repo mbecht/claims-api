@@ -4,6 +4,7 @@ import com.mbecht.claims_api.dto.ClaimDetailResponse;
 import com.mbecht.claims_api.dto.PageResponse;
 import com.mbecht.claims_api.entity.ClaimStatus;
 import com.mbecht.claims_api.exception.ErrorCode;
+import com.mbecht.claims_api.exception.InvalidRequestException;
 import com.mbecht.claims_api.exception.ResourceNotFoundException;
 import com.mbecht.claims_api.service.ClaimFilter;
 import com.mbecht.claims_api.service.ClaimService;
@@ -147,7 +148,90 @@ class ClaimControllerTest {
                         .andExpect(jsonPath("$.totalPages").value(0));
 
                 verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
-                        PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+                        PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "submittedAt")));
+        }
+
+        @Test
+        void listClaims_sortParameter_isPassedToService() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+                mockMvc.perform(get("/api/claims").param("sort", "amount,asc"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
+                        PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "amount")));
+        }
+
+        @Test
+        void listClaims_invalidSortField_returns400NamingTheFieldAsInvalid() throws Exception {
+                when(claimService.listClaims(any(), any())).thenThrow(new InvalidRequestException("sort",
+                        "Invalid sort field 'description'. Allowed sort fields: submittedAt, amount, incidentDate."));
+
+                mockMvc.perform(get("/api/claims").param("sort", "description,asc"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                        .andExpect(jsonPath("$.errors[0].field").value("sort"))
+                        .andExpect(jsonPath("$.errors[0].message").value(
+                                "Invalid sort field 'description'. Allowed sort fields: submittedAt, amount, incidentDate."));
+        }
+
+        @Test
+        void listClaims_invalidSortDirection_returns400WithoutCallingService() throws Exception {
+                mockMvc.perform(get("/api/claims").param("sort", "amount,up"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                        .andExpect(jsonPath("$.errors[0].field").value("sort"))
+                        .andExpect(jsonPath("$.errors[0].message").value(
+                                "Invalid sort direction 'up'. Allowed directions: asc, desc."));
+
+                verifyNoInteractions(claimService);
+        }
+
+        @Test
+        void listClaims_multipleSortParameters_areAppliedInOrder() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+                mockMvc.perform(get("/api/claims").param("sort", "amount,asc").param("sort", "incidentDate,desc"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
+                        PageRequest.of(0, 20, Sort.by(Sort.Order.asc("amount"), Sort.Order.desc("incidentDate"))));
+        }
+
+        @Test
+        void listClaims_pageAndSizeParameters_arePassedThrough() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 2, 5, 0, 0));
+
+                mockMvc.perform(get("/api/claims").param("page", "2").param("size", "5"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
+                        PageRequest.of(2, 5, Sort.by(Sort.Direction.DESC, "submittedAt")));
+        }
+
+        @Test
+        void listClaims_negativePage_returns400WithoutCallingService() throws Exception {
+                mockMvc.perform(get("/api/claims").param("page", "-1"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                        .andExpect(jsonPath("$.errors[0].field").value("page"))
+                        .andExpect(jsonPath("$.errors[0].message").value("Invalid page -1. Page must be 0 or greater."));
+
+                verifyNoInteractions(claimService);
+        }
+
+        @Test
+        void listClaims_zeroSize_returns400WithoutCallingService() throws Exception {
+                mockMvc.perform(get("/api/claims").param("size", "0"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+                        .andExpect(jsonPath("$.errors[0].field").value("size"))
+                        .andExpect(jsonPath("$.errors[0].message").value("Invalid size 0. Size must be 1 or greater."));
+
+                verifyNoInteractions(claimService);
         }
 
         @Test
@@ -206,7 +290,7 @@ class ClaimControllerTest {
                         .andExpect(status().isOk());
 
                 verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
-                        PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "createdAt")));
+                        PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "submittedAt")));
         }
 
         @Test

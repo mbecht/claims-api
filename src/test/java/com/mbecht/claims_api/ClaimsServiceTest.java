@@ -6,15 +6,23 @@ import com.mbecht.claims_api.entity.Claim;
 import com.mbecht.claims_api.entity.ClaimStatus;
 import com.mbecht.claims_api.entity.Policy;
 import com.mbecht.claims_api.entity.User;
+import com.mbecht.claims_api.exception.InvalidRequestException;
 import com.mbecht.claims_api.exception.ResourceNotFoundException;
 import com.mbecht.claims_api.repository.ClaimRepository;
 import com.mbecht.claims_api.repository.PolicyRepository;
+import com.mbecht.claims_api.service.ClaimFilter;
 import com.mbecht.claims_api.service.ClaimNumberGenerator;
 import com.mbecht.claims_api.service.ClaimService;
 import com.mbecht.claims_api.service.CoverageValidator;
 import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -114,6 +122,32 @@ public class ClaimsServiceTest {
         assertEquals("CLAIM-001", response.claimNumber());
         assertEquals(ClaimStatus.SUBMITTED, response.status());
         assertEquals(123, response.policy().policyNumber());
+    }
+
+    @Test
+    public void listClaims_translatesPublicSortNameAndAddsIdTiebreaker() {
+        when(claimRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+
+        claimService.listClaims(
+                new ClaimFilter(null, null, null, null),
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "submittedAt")));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(claimRepository).findAll(any(Specification.class), captor.capture());
+        assertEquals(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")), captor.getValue().getSort());
+    }
+
+    @Test
+    public void listClaims_rejectsSortFieldOutsideAllowedList() {
+        InvalidRequestException ex = assertThrows(InvalidRequestException.class, () ->
+                claimService.listClaims(
+                        new ClaimFilter(null, null, null, null),
+                        PageRequest.of(0, 20, Sort.by("createdAt"))));
+
+        assertEquals("sort", ex.getField());
+        assertEquals("Invalid sort field 'createdAt'. Allowed sort fields: submittedAt, amount, incidentDate.",
+                ex.getMessage());
+        verify(claimRepository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test

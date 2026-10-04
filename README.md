@@ -5,7 +5,7 @@
 This personal project is a demonstration of a Spring Boot REST API that could be used for enterprise insurance software needs.
 The backend service takes a mock insurance claim from submission to payout, enforcing business rules, role-based permissions and a full audit trail.
 
-> **Status:** In progress - Story 5 of 17 complete
+> **Status:** In progress - Story 6 of 17 complete
 
 ## What this project demonstrates
 - Domain modeling
@@ -85,7 +85,7 @@ A valid POST will print response headers with 201 status and a body that verifie
 ```json
 { "id": 1, "claimNumber": "CLM-2026-000001", "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED", "submittedAt": "2026-09-21T12:25:00", "updatedAt": "2026-09-21T12:25:00", "policy":
   { "policyNumber": 1001, "coverageStart": "2026-06-01", 
-  "coverageEnd": "2027-09-00", "coverageLimit": 5000.00 } 
+  "coverageEnd": "2027-06-01", "coverageLimit": 5000.00 } 
 }
 ```
 
@@ -93,24 +93,24 @@ A valid POST will print response headers with 201 status and a body that verifie
 
 Users can read claims either by searching a specific ID or returning a list of all claims that accept optional filters. The goal of these endpoints is to demonstrate paging a large result set safely and effectively.
 
-Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong data type (ex: status=1 or status=FOO). If the value is the correct type but outside the valid range, then it will return a 400 (VALIDATION_FAILED) code.
+Each query parameter will return 400 (`MALFORMED_REQUEST`) when entering the wrong data type (ex: status=1 or status=FOO). If the value is the correct type but outside the valid range, then it will return a 400 (`VALIDATION_FAILED`) code.
 
 > [!WARNING]
 > Authentication is not currently implemented. Until that time (user stories 7 and 8), anyone can read any claim.
 
 | Request | Behavior|
 |---|---|
-| GET /api/claims/{id} | Returns claim details (id, claimNumber, policyNumber, incidentDate, amount, status, submittedAt, policy{policyNumber, coverageStart, coverageEnd, coverageLimit}) | 
-| GET /api/claims | Returns a page of claim summaries sorted by newest first |
+| GET /api/claims/{id} | Returns claim details (id, claimNumber, incidentDate, amount, description, status, submittedAt, updatedAt, policy{policyNumber, coverageStart, coverageEnd, coverageLimit}) | 
+| GET /api/claims | Returns a page of claim summaries sorted by submittedAt descending by default. |
 
 | Optional Parameter | Default | Allowed values | Description |
 |---|---|---|---|
 | ?status= | n/a | SUBMITTED, UNDER_REVIEW, APPROVED, DENIED, PAID | Filters claims by status. |
-| ?policyNumber= | n/a | Integers 1 and above | Unknown policyNumber would return an empty page. |
-| ?submittedFrom={date}&submittedTo={date} | n/a | LocalDate values | Inverted date range would return an empty page. |
-| ?page= | 0 | Integers 0 and above | Page is zero-based. |
-| ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. |
-| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). |
+| ?policyNumber= | n/a | Integers | Unknown policyNumber, including negative and zero values, would return an empty page. |
+| ?submittedFrom={date}&submittedTo={date} | n/a | LocalDate values with format yyyy-MM-dd | Both dates are inclusive. Inverted date range would return an empty page. A malformed date returns 400 (`MALFORMED_REQUEST`) |
+| ?page= | 0 | Integers 0 and above | Page is zero-based. A negative value returns 400 (`VALIDATION_FAILED`) |
+| ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. A size below 1 returns 400 (`VALIDATION_FAILED`) |
+| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Direction is asc or desc, case-insensitive, and defaults to asc when ommitted. Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). An unknowne field or direction returns 400 (`VALIDATION_FAILED`). Ties are broken by id ascending, so pages don't overlap. |
 
 The following is an example GET request and response for claim details:
 
@@ -137,10 +137,10 @@ curl.exe -i `
 {
   "content": 
   [ 
-    { "id": 1, "claimNumber": "CLM-2026-000001", "policyNumber": 1001, "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, 
-    "status": "SUBMITTED",  "submittedAt": "2026-09-21T12:25:00" },
-    { "id": 2, "claimNumber": "CLM-2026-000002", "policyNumber": 1002, "incidentDate": "2026-09-22T10:30:00", "amount": 500.00, 
-    "status": "SUBMITTED",  "submittedAt": "2026-09-24T11:45:00" }
+    { "id": 2, "claimNumber": "CLM-2026-000002", "policyNumber": 1002, "incidentDate": "2026-09-22T09:15:00", "amount": 1250.00, 
+    "status": "SUBMITTED",  "submittedAt": "2026-09-24T12:25:00" },
+    { "id": 1, "claimNumber": "CLM-2026-000001", "policyNumber": 1001, "incidentDate": "2026-09-21T10:30:00", "amount": 500.00, 
+    "status": "SUBMITTED",  "submittedAt": "2026-09-21T11:45:00" }
   ],
   "page": 0,
   "size": 20,
@@ -184,7 +184,7 @@ See [docs/decisions](docs/decisions/) for the reasoning behind key choices.
 - [x] Consistent error responses
 - [x] Claim submission
 - [x] Coverage validation
-- [ ] View and search claims
+- [x] View and search claims
 - [ ] Login with token
 - [ ] Role-based access
 - [ ] Enforce the claim lifecycle

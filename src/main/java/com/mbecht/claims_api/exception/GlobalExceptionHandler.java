@@ -44,6 +44,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidRequest(InvalidRequestException ex) {
+        ProblemDetail problem = newProblemDetail(
+                HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED, "One or more fields are invalid.");
+        problem.setProperty("errors", List.of(new FieldValidationError(ex.getField(), ex.getMessage())));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ProblemDetail> handleBusinessRule(BusinessRuleException ex) {
         ProblemDetail problem = newProblemDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getErrorCode(), ex.getMessage());

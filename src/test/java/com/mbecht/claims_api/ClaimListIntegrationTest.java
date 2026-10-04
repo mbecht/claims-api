@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class ClaimListIntegrationTest {
 
-    private static final Pageable FIRST_PAGE = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+    private static final Pageable FIRST_PAGE = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "submittedAt"));
     private static final ClaimFilter NO_FILTERS = new ClaimFilter(null, null, null, null);
 
     @Autowired
@@ -72,12 +72,12 @@ class ClaimListIntegrationTest {
         entityManager.persist(policy9001);
         entityManager.persist(policy9002);
 
-        persistClaim("CLM-TEST-000001", policy9001, ClaimStatus.SUBMITTED, LocalDateTime.parse("2026-03-10T23:59:59"));
-        persistClaim("CLM-TEST-000002", policy9001, ClaimStatus.SUBMITTED, LocalDateTime.parse("2026-03-11T00:00:00"));
-        persistClaim("CLM-TEST-000003", policy9001, ClaimStatus.APPROVED, LocalDateTime.parse("2026-03-20T12:00:00"));
-        persistClaim("CLM-TEST-000004", policy9001, ClaimStatus.SUBMITTED, LocalDateTime.parse("2026-03-31T23:59:59"));
-        persistClaim("CLM-TEST-000005", policy9001, ClaimStatus.PAID, LocalDateTime.parse("2026-04-01T00:00:00"));
-        persistClaim("CLM-TEST-000006", policy9002, ClaimStatus.PAID, LocalDateTime.parse("2026-03-15T09:00:00"));
+        persistClaim("CLM-TEST-000001", policy9001, ClaimStatus.SUBMITTED, "600.00", LocalDateTime.parse("2026-03-10T23:59:59"));
+        persistClaim("CLM-TEST-000002", policy9001, ClaimStatus.SUBMITTED, "500.00", LocalDateTime.parse("2026-03-11T00:00:00"));
+        persistClaim("CLM-TEST-000003", policy9001, ClaimStatus.APPROVED, "400.00", LocalDateTime.parse("2026-03-20T12:00:00"));
+        persistClaim("CLM-TEST-000004", policy9001, ClaimStatus.SUBMITTED, "300.00", LocalDateTime.parse("2026-03-31T23:59:59"));
+        persistClaim("CLM-TEST-000005", policy9001, ClaimStatus.PAID, "200.00", LocalDateTime.parse("2026-04-01T00:00:00"));
+        persistClaim("CLM-TEST-000006", policy9002, ClaimStatus.PAID, "100.00", LocalDateTime.parse("2026-03-15T09:00:00"));
 
         // Clear the persistence context so queries read the values we just wrote to the database.
         entityManager.flush();
@@ -201,7 +201,7 @@ class ClaimListIntegrationTest {
     void filtersCombineWithPaging() {
         PageResponse<ClaimSummaryResponse> secondPage = claimService.listClaims(
                 new ClaimFilter(null, 9001, LocalDate.parse("2026-03-11"), LocalDate.parse("2026-03-31")),
-                PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "createdAt")));
+                PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "submittedAt")));
 
         // Three claims match (000002, 000003, 000004), so page 2 of size 2 holds the last one.
         assertThat(secondPage.totalElements()).isEqualTo(3);
@@ -221,11 +221,54 @@ class ClaimListIntegrationTest {
         });
     }
 
+    // --- Sorting and paging ---
+
+    @Test
+    void sortBySubmittedAtDescending_isTheDefaultOrder() {
+        PageResponse<ClaimSummaryResponse> page = claimService.listClaims(
+                NO_FILTERS, PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "submittedAt")));
+
+        assertThat(page.content())
+                .extracting(ClaimSummaryResponse::claimNumber)
+                .containsExactly(
+                        "CLM-TEST-000005", "CLM-TEST-000004", "CLM-TEST-000003",
+                        "CLM-TEST-000006", "CLM-TEST-000002", "CLM-TEST-000001");
+    }
+
+    @Test
+    void sortByAmountAscending_ordersByAmount() {
+        PageResponse<ClaimSummaryResponse> page = claimService.listClaims(
+                NO_FILTERS, PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "amount")));
+
+        assertThat(page.content())
+                .extracting(ClaimSummaryResponse::claimNumber)
+                .containsExactly(
+                        "CLM-TEST-000006", "CLM-TEST-000005", "CLM-TEST-000004",
+                        "CLM-TEST-000003", "CLM-TEST-000002", "CLM-TEST-000001");
+    }
+
+    @Test
+    void consecutivePagesSortedByAmount_continueWhereThePreviousPageEnded() {
+        Sort byAmount = Sort.by(Sort.Direction.ASC, "amount");
+
+        PageResponse<ClaimSummaryResponse> first = claimService.listClaims(NO_FILTERS, PageRequest.of(0, 2, byAmount));
+        PageResponse<ClaimSummaryResponse> second = claimService.listClaims(NO_FILTERS, PageRequest.of(1, 2, byAmount));
+
+        assertThat(first.content())
+                .extracting(ClaimSummaryResponse::claimNumber)
+                .containsExactly("CLM-TEST-000006", "CLM-TEST-000005");
+        assertThat(second.content())
+                .extracting(ClaimSummaryResponse::claimNumber)
+                .containsExactly("CLM-TEST-000004", "CLM-TEST-000003");
+    }
+
     // --- N+1 avoidance ---
 
     @Test
     void searchLoadsEachClaimsPolicyInTheSameQuery() {
-        Page<Claim> page = claimRepository.findAll(ClaimSpecifications.matching(NO_FILTERS), FIRST_PAGE);
+        // Called on the repository, not the service, so the sort uses the entity property name.
+        Pageable entityPage = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Claim> page = claimRepository.findAll(ClaimSpecifications.matching(NO_FILTERS), entityPage);
         PersistenceUnitUtil persistenceUnit = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
 
         // If the policy were a lazy proxy here, it would cost one extra SELECT per claim when read.
@@ -234,8 +277,8 @@ class ClaimListIntegrationTest {
                 .allSatisfy(claim -> assertThat(persistenceUnit.isLoaded(claim, "policy")).isTrue());
     }
 
-    private void persistClaim(String claimNumber, Policy policy, ClaimStatus status, LocalDateTime createdAt) {
-        Claim claim = new Claim(claimNumber, policy, createdAt.minusDays(1), new BigDecimal("100.00"), "Test claim");
+    private void persistClaim(String claimNumber, Policy policy, ClaimStatus status, String amount, LocalDateTime createdAt) {
+        Claim claim = new Claim(claimNumber, policy, createdAt.minusDays(1), new BigDecimal(amount), "Test claim");
         entityManager.persist(claim);
         entityManager.flush();
 
