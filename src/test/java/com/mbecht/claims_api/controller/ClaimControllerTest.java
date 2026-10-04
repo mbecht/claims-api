@@ -1,14 +1,19 @@
 package com.mbecht.claims_api.controller;
 
 import com.mbecht.claims_api.dto.ClaimDetailResponse;
+import com.mbecht.claims_api.dto.PageResponse;
 import com.mbecht.claims_api.entity.ClaimStatus;
 import com.mbecht.claims_api.exception.ErrorCode;
 import com.mbecht.claims_api.exception.ResourceNotFoundException;
+import com.mbecht.claims_api.service.ClaimFilter;
 import com.mbecht.claims_api.service.ClaimService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,10 +21,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -124,6 +132,81 @@ class ClaimControllerTest {
                         .andExpect(jsonPath("$.errors[0].field").value("id"));
 
                 verifyNoInteractions(claimService);
+        }
+
+        @Test
+        void listClaims_noFilters_usesDefaultPagingAndNoStatus() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+                mockMvc.perform(get("/api/claims"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.page").value(0))
+                        .andExpect(jsonPath("$.size").value(20))
+                        .andExpect(jsonPath("$.totalElements").value(0))
+                        .andExpect(jsonPath("$.totalPages").value(0));
+
+                verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
+                        PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+        }
+
+        @Test
+        void listClaims_statusParameter_passesStatusToService() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+                mockMvc.perform(get("/api/claims").param("status", "PAID"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(eq(new ClaimFilter(ClaimStatus.PAID, null, null, null)), any(Pageable.class));
+        }
+
+        @Test
+        void listClaims_policyNumberAndInclusiveDateRange_passedToService() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+                mockMvc.perform(get("/api/claims")
+                                .param("policyNumber", "1001")
+                                .param("submittedFrom", "2026-01-01")
+                                .param("submittedTo", "2026-02-01"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(
+                        eq(new ClaimFilter(null, 1001, LocalDate.parse("2026-01-01"), LocalDate.parse("2026-02-01"))),
+                        any(Pageable.class));
+        }
+
+        @Test
+        void listClaims_malformedDate_returns400WithMalformedRequest() throws Exception {
+                mockMvc.perform(get("/api/claims").param("submittedFrom", "yesterday"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"))
+                        .andExpect(jsonPath("$.errors[0].field").value("submittedFrom"));
+
+                verifyNoInteractions(claimService);
+        }
+
+        @Test
+        void listClaims_unknownStatus_returns400WithMalformedRequest() throws Exception {
+                mockMvc.perform(get("/api/claims").param("status", "FOO"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"))
+                        .andExpect(jsonPath("$.errors[0].field").value("status"));
+
+                verifyNoInteractions(claimService);
+        }
+
+        @Test
+        void listClaims_sizeAboveMaximum_isClampedToFifty() throws Exception {
+                when(claimService.listClaims(any(), any())).thenReturn(
+                        new PageResponse<>(List.of(), 0, 50, 0, 0));
+
+                mockMvc.perform(get("/api/claims").param("size", "500"))
+                        .andExpect(status().isOk());
+
+                verify(claimService).listClaims(new ClaimFilter(null, null, null, null),
+                        PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "createdAt")));
         }
 
         @Test

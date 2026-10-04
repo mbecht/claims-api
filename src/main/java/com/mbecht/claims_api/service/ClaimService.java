@@ -1,13 +1,18 @@
 package com.mbecht.claims_api.service;
 
 import com.mbecht.claims_api.dto.ClaimDetailResponse;
+import com.mbecht.claims_api.dto.ClaimSummaryResponse;
+import com.mbecht.claims_api.dto.PageResponse;
 import com.mbecht.claims_api.dto.SubmitClaimRequest;
 import com.mbecht.claims_api.entity.Claim;
 import com.mbecht.claims_api.entity.Policy;
 import com.mbecht.claims_api.exception.ErrorCode;
 import com.mbecht.claims_api.exception.ResourceNotFoundException;
 import com.mbecht.claims_api.repository.ClaimRepository;
+import com.mbecht.claims_api.repository.ClaimSpecifications;
 import com.mbecht.claims_api.repository.PolicyRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +65,29 @@ public class ClaimService {
                         "No claim found with id " + id));
 
         return toDetailResponse(claim);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ClaimSummaryResponse> listClaims(ClaimFilter filter, Pageable pageable) {
+        Page<Claim> page = claimRepository.findAll(ClaimSpecifications.matching(filter), pageable);
+
+        return new PageResponse<>(
+                page.map(this::toSummaryResponse).getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages());
+    }
+
+    private ClaimSummaryResponse toSummaryResponse(Claim claim) {
+        return new ClaimSummaryResponse(
+                claim.getId(),
+                claim.getClaimNumber(),
+                claim.getPolicy().getPolicyNumber(),
+                claim.getIncidentDate(),
+                claim.getAmount(),
+                claim.getStatus(),
+                claim.getCreatedAt());
     }
 
     private ClaimDetailResponse toDetailResponse(Claim claim) {

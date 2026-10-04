@@ -106,6 +106,8 @@ Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong
 | Optional Parameter | Default | Allowed values | Description |
 |---|---|---|---|
 | ?status= | n/a | SUBMITTED, UNDER_REVIEW, APPROVED, DENIED, PAID | Filters claims by status. |
+| ?policyNumber= | n/a | Integers 1 and above | Unknown policyNumber would return an empty page. |
+| ?submittedFrom={date}&submittedTo={date} | n/a | LocalDate values | Inverted date range would return an empty page. |
 | ?page= | 0 | Integers 0 and above | Page is zero-based. |
 | ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. |
 | ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). |
