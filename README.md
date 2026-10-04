@@ -28,7 +28,7 @@ Java 25 · Spring Boot 4.1 · Maven · PostgreSQL 17 · Docker Compose · JUnit 
 ```
 4. Check that it's running
 ```powershell
-   curl http://localhost:8080/actuator/health
+   curl.exe http://localhost:8080/actuator/health
    # {"status":"UP"}
 ```
 
@@ -72,7 +72,7 @@ The following POST body ([requests/submit-claim.json](requests/submit-claim.json
 }
 ```
 
-The following POST request writes to a different Postgres instance than Docker. The difference is a persistent claims DB vs. a ephemeral Testcontainers test DB.
+The following POST request writes to a different Postgres instance than Docker. The difference is a persistent claims DB vs. an ephemeral Testcontainers test DB.
 
 ```powershell
 curl.exe -i -X POST http://localhost:8080/api/claims `
@@ -82,18 +82,25 @@ curl.exe -i -X POST http://localhost:8080/api/claims `
 
 A valid POST will print response headers with 201 status and a body that verifies "status":"SUBMITTED". The claims table on same Postgres instance will record the new claim record.
 
+```json
+{ "id": 1, "claimNumber": "CLM-2026-000001", "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED", "submittedAt": "2026-09-21T12:25:00", "updatedAt": "2026-09-21T12:25:00", "policy":
+  { "policyNumber": 1001, "coverageStart": "2026-06-01", 
+  "coverageEnd": "2027-09-00", "coverageLimit": 5000.00 } 
+}
+```
+
 ## API GET Endpoints
 
 Users can read claims either by searching a specific ID or returning a list of all claims that accept optional filters. The goal of these endpoints is to demonstrate paging a large result set safely and effectively.
 
-Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong data type (ex: status=1). If the value is the correct type but outside the valid range, then it will return a 400 (VALIDATION_FAILED) code (ex: size=0).
+Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong data type (ex: status=1 or status=FOO). If the value is the correct type but outside the valid range, then it will return a 400 (VALIDATION_FAILED) code.
 
 > [!WARNING]
 > Authentication is not currently implemented. Until that time (user stories 7 and 8), anyone can read any claim.
 
 | Request | Behavior|
 |---|---|
-| GET /api/claims/{id} | Returns claim details (id, claimNumber, policyNumber, incidentDate, amount, description, status, submittedAt) | 
+| GET /api/claims/{id} | Returns claim details (id, claimNumber, policyNumber, incidentDate, amount, status, submittedAt, policy{policyNumber, coverageStart, coverageEnd, coverageLimit}) | 
 | GET /api/claims | Returns a page of claim summaries sorted by newest first |
 
 | Optional Parameter | Default | Allowed values | Description |
@@ -101,25 +108,37 @@ Each query parameter will return 400 (MALFORMED_REQUEST) when entering the wrong
 | ?status= | n/a | SUBMITTED, UNDER_REVIEW, APPROVED, DENIED, PAID | Filters claims by status. |
 | ?page= | 0 | Integers 0 and above | Page is zero-based. |
 | ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. |
-| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Sort by one or more fields (ex: ?sort=amount,desc&incidentDate,asc). |
+| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). |
 
-The following is an example GET request:
+The following is an example GET request and response for claim details:
+
+```powershell
+curl.exe -i `
+  "http://localhost:8080/api/claims/1"
+```
+
+```json
+{ "id": 1, "claimNumber": "CLM-2026-000001", "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED", "submittedAt": "2026-09-21T12:25:00", "updatedAt": "2026-09-21T12:25:00", "policy":
+  { "policyNumber": 1001, "coverageStart": "2026-06-01", 
+  "coverageEnd": "2027-09-00", "coverageLimit": 5000.00 } 
+}
+```
+
+The following is an example GET request and response for claim summaries:
 
 ```powershell
 curl.exe -i `
   "http://localhost:8080/api/claims?status=SUBMITTED&page=0&size=20"
 ```
 
-The following is a sample GET response:
-
 ```json
 {
   "content": 
   [ 
     { "id": 1, "claimNumber": "CLM-2026-000001", "policyNumber": 1001, "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, 
-    "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED",  "submittedAt": "2026-09-21T12:25:00" },
+    "status": "SUBMITTED",  "submittedAt": "2026-09-21T12:25:00" },
     { "id": 2, "claimNumber": "CLM-2026-000002", "policyNumber": 1002, "incidentDate": "2026-09-22T10:30:00", "amount": 500.00, 
-    "description": "Side mirror damage", "status": "SUBMITTED",  "submittedAt": "2026-09-24T11:45:00" }
+    "status": "SUBMITTED",  "submittedAt": "2026-09-24T11:45:00" }
   ],
   "page": 0,
   "size": 20,
@@ -130,13 +149,15 @@ The following is a sample GET response:
 
 ## Error responses
 
-All errors return a consistent JSON body following the [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) standard, with the content type of 'application/problem+json'. Every response includes a 'errorCode' as well as a UTC 'timestamp'.
+All errors return a consistent JSON body following the [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) standard, with the content type of 'application/problem+json'. Every response includes a `errorCode` as well as a UTC `timestamp`.
 
 | Error code | HTTP status | Meaning | Example cause |
 |---|:---:|---|---|
 | `VALIDATION_FAILED` | 400 | One or more fields are invalid; see `errors` | Negative claim amount |
-| `MALFORMED_REQUEST` | 400 | The request body isn't valid JSON or has the wrong types | Text sent where a number is expected |
+| `MALFORMED_REQUEST` | 400 | The request body, path or query value isn't valid JSON or has the wrong types | Text sent where a number is expected |
 | `CLAIM_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown claim ID |
+| `POLICY_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown policy number |
+| `NO_SUCH_ENDPOINT` | 404 | The requested URL doesn't exist | Unknown URL |
 | `ILLEGAL_STATUS_TRANSITION` | 409 | The request conflicts with the item's current state | Moving a claim from Submitted straight to Paid |
 | `POLICY_NOT_YET_ACTIVE` | 422 | The request is valid but breaks a business rule | Filing a claim on a policy that has not started yet |
 | `POLICY_EXPIRED` | 422 | The request is valid but breaks a business rule | Filing a claim on an expired policy |

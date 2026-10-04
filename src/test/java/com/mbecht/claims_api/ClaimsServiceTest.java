@@ -1,6 +1,6 @@
 package com.mbecht.claims_api;
 
-import com.mbecht.claims_api.dto.ClaimResponse;
+import com.mbecht.claims_api.dto.ClaimDetailResponse;
 import com.mbecht.claims_api.dto.SubmitClaimRequest;
 import com.mbecht.claims_api.entity.Claim;
 import com.mbecht.claims_api.entity.ClaimStatus;
@@ -66,7 +66,7 @@ public class ClaimsServiceTest {
     }
 
     @Test
-    public void testValidRequest() {
+    public void testValidPostRequest() {
         // Implement test logic for a valid request that creates a claim with status "SUBMITTED"
         int policyNumber = 123;
         String claimNumber = "CLAIM-001";
@@ -76,18 +76,18 @@ public class ClaimsServiceTest {
         SubmitClaimRequest request = new SubmitClaimRequest(policyNumber, LocalDateTime.now(), new BigDecimal("500.00"), "Test claim description");
 
         // Act
-        ClaimResponse response = claimService.submitClaim(request);
+        ClaimDetailResponse response = claimService.submitClaim(request);
 
         // Assert
         assertNotNull(response.claimNumber());
         assertEquals(ClaimStatus.SUBMITTED, response.status());
         assertEquals(claimNumber, response.claimNumber());
-        assertEquals(policyNumber, response.policyNumber());
+        assertEquals(policyNumber, response.policy().policyNumber());
         verify(claimRepository).save(any(Claim.class));
     }
 
     @Test
-    public void testUnknownPolicyNumber() {
+    public void testUnknownPolicyNumberPost() {
         // Does an unknown policy throw and skip save?
         // Arrange
         SubmitClaimRequest request = new SubmitClaimRequest(999, LocalDateTime.now(), new BigDecimal("500.00"), "Test claim description");
@@ -97,5 +97,31 @@ public class ClaimsServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> claimService.submitClaim(request));
         verify(claimRepository, never()).save(any(Claim.class));
 
+    }
+
+    @Test
+    public void testValidGetRequest() {
+        // Arrange
+        Policy policy = new Policy(123, new User(null, null, null), LocalDate.now().minusMonths(6), LocalDate.now().plusMonths(6), new BigDecimal("1000.00"));
+        Claim claim = new Claim("CLAIM-001", policy, LocalDateTime.now(), new BigDecimal("500.00"), "Test claim description");
+        when(claimRepository.findById(1L)).thenReturn(Optional.of(claim));
+
+        // Act
+        ClaimDetailResponse response = claimService.getClaim(1L);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals("CLAIM-001", response.claimNumber());
+        assertEquals(ClaimStatus.SUBMITTED, response.status());
+        assertEquals(123, response.policy().policyNumber());
+    }
+
+    @Test
+    public void testUnknownIdGet() {
+        // Arrange
+        when(claimRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // Act and Assert
+        assertThrows(ResourceNotFoundException.class, () -> claimService.getClaim(999L));
     }
 }

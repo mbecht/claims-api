@@ -1,7 +1,9 @@
 package com.mbecht.claims_api.controller;
 
-import com.mbecht.claims_api.dto.ClaimResponse;
+import com.mbecht.claims_api.dto.ClaimDetailResponse;
 import com.mbecht.claims_api.entity.ClaimStatus;
+import com.mbecht.claims_api.exception.ErrorCode;
+import com.mbecht.claims_api.exception.ResourceNotFoundException;
 import com.mbecht.claims_api.service.ClaimService;
 
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.endsWith;
@@ -19,6 +22,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,15 +45,20 @@ class ClaimControllerTest {
 
         @Test
         void submitClaim_validRequest_returns201WithLocationAndSubmittedStatus() throws Exception {
-                ClaimResponse response = new ClaimResponse(
+                ClaimDetailResponse response = new ClaimDetailResponse(
                         42L,
                         "CLM-000042",
-                        123,
                         LocalDateTime.parse("2026-01-15T10:00:00"),
                         new BigDecimal("500.00"),
                         "Test claim description",
                         ClaimStatus.SUBMITTED,
-                        LocalDateTime.now());
+                        LocalDateTime.now(),
+                        LocalDateTime.now(),
+                        new ClaimDetailResponse.PolicyInfo(
+                                123,
+                                LocalDate.parse("2025-06-01"),
+                                LocalDate.parse("2026-06-01"),
+                                new BigDecimal("1000.00")));
 
                 when(claimService.submitClaim(any())).thenReturn(response);
 
@@ -69,6 +78,52 @@ class ClaimControllerTest {
                         .andExpect(header().string("Location", endsWith("/api/claims/42")))
                         .andExpect(jsonPath("$.id").value(42))
                         .andExpect(jsonPath("$.status").value("SUBMITTED"));
+        }
+
+        @Test
+        void getClaim_existingId_returns200WithClaimDetails() throws Exception {
+                ClaimDetailResponse response = new ClaimDetailResponse(
+                        42L,
+                        "CLM-000042",
+                        LocalDateTime.parse("2026-01-15T10:00:00"),
+                        new BigDecimal("500.00"),
+                        "Test claim description",
+                        ClaimStatus.SUBMITTED,
+                        LocalDateTime.parse("2026-01-16T09:00:00"),
+                        LocalDateTime.parse("2026-01-16T09:00:00"),
+                        new ClaimDetailResponse.PolicyInfo(
+                                123,
+                                LocalDate.parse("2025-06-01"),
+                                LocalDate.parse("2026-06-01"),
+                                new BigDecimal("1000.00")));
+
+                when(claimService.getClaim(42L)).thenReturn(response);
+
+                mockMvc.perform(get("/api/claims/42"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.id").value(42))
+                        .andExpect(jsonPath("$.claimNumber").value("CLM-000042"))
+                        .andExpect(jsonPath("$.policy.policyNumber").value(123));
+        }
+
+        @Test
+        void getClaim_unknownId_returns404WithClaimNotFound() throws Exception {
+                when(claimService.getClaim(999L)).thenThrow(
+                        new ResourceNotFoundException(ErrorCode.CLAIM_NOT_FOUND, "No claim found with id 999"));
+
+                mockMvc.perform(get("/api/claims/999"))
+                        .andExpect(status().isNotFound())
+                        .andExpect(jsonPath("$.errorCode").value("CLAIM_NOT_FOUND"));
+        }
+
+        @Test
+        void getClaim_nonNumericId_returns400WithMalformedRequest() throws Exception {
+                mockMvc.perform(get("/api/claims/abc"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"))
+                        .andExpect(jsonPath("$.errors[0].field").value("id"));
+
+                verifyNoInteractions(claimService);
         }
 
         @Test

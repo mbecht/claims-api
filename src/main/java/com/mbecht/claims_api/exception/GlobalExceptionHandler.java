@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -86,6 +87,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = newProblemDetail(
                 HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST, "The request body could not be read.");
         problem.setProperty("errors", List.of(new FieldValidationError("requestBody", "Malformed JSON request")));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+
+        log.warn("Type mismatch for '{}': {}", ex.getPropertyName(), ex.getMessage());
+
+        ProblemDetail problem = newProblemDetail(
+                HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST, "A request parameter has the wrong type.");
+        problem.setProperty("errors", List.of(new FieldValidationError(ex.getPropertyName(), "Invalid value")));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }

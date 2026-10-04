@@ -121,7 +121,7 @@ RFC 9457 exception handler, the claim submission endpoint, and coverage validati
 package is `com.mbecht.claims_api`, organized as:
 
 - `controller` — `ClaimController` (`POST /api/claims`)
-- `dto` — `SubmitClaimRequest`, `ClaimResponse`
+- `dto` — `SubmitClaimRequest`, `ClaimDetailResponse`, `ClaimSummaryResponse`, `PageResponse`
 - `entity` — `Claim`, `Policy`, `User`, `Role`, `ClaimStatus`
 - `repository` — `ClaimRepository`, `PolicyRepository`
 - `service` — `ClaimService`, `ClaimNumberGenerator`, `CoverageValidator`

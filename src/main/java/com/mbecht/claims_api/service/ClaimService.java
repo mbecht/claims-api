@@ -1,6 +1,6 @@
 package com.mbecht.claims_api.service;
 
-import com.mbecht.claims_api.dto.ClaimResponse;
+import com.mbecht.claims_api.dto.ClaimDetailResponse;
 import com.mbecht.claims_api.dto.SubmitClaimRequest;
 import com.mbecht.claims_api.entity.Claim;
 import com.mbecht.claims_api.entity.Policy;
@@ -30,7 +30,7 @@ public class ClaimService {
     }
 
     @Transactional
-    public ClaimResponse submitClaim(SubmitClaimRequest request) {
+    public ClaimDetailResponse submitClaim(SubmitClaimRequest request) {
         Policy policy = policyRepository.findByPolicyNumber(request.policyNumber())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         ErrorCode.POLICY_NOT_FOUND,
@@ -49,18 +49,36 @@ public class ClaimService {
 
         Claim saved = claimRepository.save(claim);
 
-        return toResponse(saved);
+        return toDetailResponse(saved);
     }
 
-    private ClaimResponse toResponse(Claim claim) {
-        return new ClaimResponse(
+    @Transactional(readOnly = true)
+    public ClaimDetailResponse getClaim(Long id) {
+        Claim claim = claimRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        ErrorCode.CLAIM_NOT_FOUND,
+                        "No claim found with id " + id));
+
+        return toDetailResponse(claim);
+    }
+
+    private ClaimDetailResponse toDetailResponse(Claim claim) {
+        Policy policy = claim.getPolicy();
+
+        return new ClaimDetailResponse(
                 claim.getId(),
                 claim.getClaimNumber(),
-                claim.getPolicy().getPolicyNumber(),
                 claim.getIncidentDate(),
                 claim.getAmount(),
                 claim.getDescription(),
                 claim.getStatus(),
-                claim.getCreatedAt());
+                claim.getCreatedAt(),
+                claim.getUpdatedAt(),
+                new ClaimDetailResponse.PolicyInfo(
+                        policy.getPolicyNumber(),
+                        policy.getCoverageStart(),
+                        policy.getCoverageEnd(),
+                        policy.getCoverageLimit()));
     }
+
 }
