@@ -110,7 +110,7 @@ Each query parameter will return 400 (`MALFORMED_REQUEST`) when entering the wro
 | ?submittedFrom={date}&submittedTo={date} | n/a | LocalDate values with format yyyy-MM-dd | Both dates are inclusive. Inverted date range would return an empty page. A malformed date returns 400 (`MALFORMED_REQUEST`) |
 | ?page= | 0 | Integers 0 and above | Page is zero-based. A negative value returns 400 (`VALIDATION_FAILED`) |
 | ?size= | 20 | Integers 1 and above | Values above 50 are reduced to 50. A size below 1 returns 400 (`VALIDATION_FAILED`) |
-| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Direction is asc or desc, case-insensitive, and defaults to asc when ommitted. Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). An unknowne field or direction returns 400 (`VALIDATION_FAILED`). Ties are broken by id ascending, so pages don't overlap. |
+| ?sort= | submittedAt,desc | submittedAt (maps to createdAt), amount, incidentDate | Direction is asc or desc, case-insensitive, and defaults to asc when omitted. Sort by one or more fields (ex: ?sort=amount,desc&sort=incidentDate,asc). An unknown field or direction returns 400 (`VALIDATION_FAILED`). Ties are broken by id ascending, so pages don't overlap. |
 
 The following is an example GET request and response for claim details:
 
@@ -122,7 +122,7 @@ curl.exe -i `
 ```json
 { "id": 1, "claimNumber": "CLM-2026-000001", "incidentDate": "2026-09-20T09:15:00", "amount": 1250.00, "description": "Rear bumper damage from parking lot collision", "status": "SUBMITTED", "submittedAt": "2026-09-21T12:25:00", "updatedAt": "2026-09-21T12:25:00", "policy":
   { "policyNumber": 1001, "coverageStart": "2026-06-01", 
-  "coverageEnd": "2027-09-00", "coverageLimit": 5000.00 } 
+  "coverageEnd": "2027-06-01", "coverageLimit": 5000.00 } 
 }
 ```
 
@@ -155,7 +155,7 @@ All errors return a consistent JSON body following the [RFC 9457 Problem Details
 
 | Error code | HTTP status | Meaning | Example cause |
 |---|:---:|---|---|
-| `VALIDATION_FAILED` | 400 | One or more fields are invalid; see `errors` | Negative claim amount |
+| `VALIDATION_FAILED` | 400 | One or more fields are invalid; see `errors` | Negative claim amount; Sort field not in the allowed list |
 | `MALFORMED_REQUEST` | 400 | The request body, path or query value isn't valid JSON or has the wrong types | Text sent where a number is expected |
 | `CLAIM_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown claim ID |
 | `POLICY_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown policy number |

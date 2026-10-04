@@ -59,8 +59,8 @@ Phase 2 — Core claims
 [x] Claim amount exceeding the policy's coverage limit → 422; an amount equal to the limit is valid
 [x] Unit tests cover each rule, written before implementation
 6. View and search claims. As a user, I want to see a claim's details and a filtered list of claims, so I can track their progress.
-[ ] GET /api/claims/{id} returns full claim details
-[ ] GET /api/claims supports filtering by status and paging
+[x] GET /api/claims/{id} returns full claim details
+[x] GET /api/claims supports filtering by status and paging
 Phase 3 — Security
 7. Log in with a token. As a user, I want to log in and receive a JWT, so the API knows who I am on each request.
 [ ] POST /api/auth/login returns a token for valid credentials, 401 otherwise
@@ -116,16 +116,17 @@ The project is ready to showcase when all of these are true:
 
 ## Project state
 
-Stories 1–5 are complete: project skeleton/Docker/CI, Flyway-managed schema with dev-only seed data, a global
-RFC 9457 exception handler, the claim submission endpoint, and coverage validation against the policy. The base
-package is `com.mbecht.claims_api`, organized as:
+Stories 1–6 are complete: project skeleton/Docker/CI, Flyway-managed schema with dev-only seed data, a global
+RFC 9457 exception handler, the claim submission endpoint, coverage validation against the policy, and claim
+viewing and search (detail by ID, plus a paged, filtered and sorted list). The base package is
+`com.mbecht.claims_api`, organized as:
 
-- `controller` — `ClaimController` (`POST /api/claims`)
-- `dto` — `SubmitClaimRequest`, `ClaimDetailResponse`, `ClaimSummaryResponse`, `PageResponse`
+- `controller` — `ClaimController` (`POST /api/claims`, `GET /api/claims/{id}`, `GET /api/claims`)
+- `dto` — `SubmitClaimRequest`, `ClaimDetailResponse` (with nested `PolicyInfo`), `ClaimSummaryResponse`, `PageResponse`
 - `entity` — `Claim`, `Policy`, `User`, `Role`, `ClaimStatus`
-- `repository` — `ClaimRepository`, `PolicyRepository`
-- `service` — `ClaimService`, `ClaimNumberGenerator`, `CoverageValidator`
-- `exception` — `GlobalExceptionHandler`, `ErrorCode`, `ResourceNotFoundException`, `ConflictException`, `BusinessRuleException`
+- `repository` — `ClaimRepository`, `PolicyRepository`, `ClaimSpecifications`
+- `service` — `ClaimService`, `ClaimFilter`, `ClaimSortField`, `ClaimNumberGenerator`, `CoverageValidator`
+- `exception` — `GlobalExceptionHandler`, `ErrorCode`, `ResourceNotFoundException`, `InvalidRequestException`, `ConflictException`, `BusinessRuleException`
 
 `ClaimService.submitClaim` looks up the policy (404 via `ResourceNotFoundException` if unknown), then delegates to
 `CoverageValidator.validate` to check the incident date against the coverage period and the claim amount against
@@ -133,6 +134,23 @@ the coverage limit, each violation raising a `BusinessRuleException` (422) with 
 (`POLICY_EXPIRED`, `POLICY_NOT_YET_ACTIVE`, `CLAIM_AMOUNT_EXCEEDS_POLICY_LIMIT`). `CoverageValidatorTest` covers the
 three rules and their inclusive boundaries in isolation; `ClaimsServiceTest` covers the service's own orchestration
 (policy lookup, claim number generation, persistence).
+
+Reads: `ClaimService.getClaim` returns one claim or throws `CLAIM_NOT_FOUND` (404). `ClaimService.listClaims` takes a
+`ClaimFilter` and a `Pageable`, builds one `Specification` from `ClaimSpecifications.matching` (each predicate returns
+null when its filter is unset, so any combination works), and returns a `PageResponse`. The controller reads
+`page` and `size` as explicit parameters, caps `size` at 50, and parses `sort` from the raw parameter map so that
+repeated values work. The service maps the public sort names (`submittedAt`, `amount`, `incidentDate`) to entity
+properties through `ClaimSortField`, rejects anything else with `InvalidRequestException` (400 `VALIDATION_FAILED`),
+and appends `id` as a tiebreaker. `ClaimRepository` overrides the specification search with an `@EntityGraph` on
+`policy` to avoid one query per claim. The `submittedFrom`/`submittedTo` filters compare against `createdAt`,
+which the API calls `submittedAt`.
+
+Next session (deferred, not started):
+- Add more web-layer tests (`@WebMvcTest`) for the claim endpoints: exception paths, parameter binding edge cases,
+  and the `PageResponse` shape.
+- Seed a batch of about 25 test claims so the integration tests can confirm paging and sorting across several
+  pages (currently `ClaimListIntegrationTest` uses six claims, which can't show multi-page behaviour at the default
+  size of 20).
 
 Sample request payloads for manual testing live in `requests/` at the repo root (not under `src/`, since they're
 dev tooling, not part of the build).
