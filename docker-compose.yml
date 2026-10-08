@@ -24,6 +24,7 @@ services:
       DB_URL: jdbc:postgresql://db:5432/claims
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_PROFILES_ACTIVE: dev
     ports:
       - "8080:8080"

@@ -33,6 +33,19 @@ The claim amount must not exceed the coverage limit amount; an amount equal to t
 - Policy renewal semantics — whether a renewed policy reuses its `policy_number` or gets a new one (the schema currently treats `policy_number` as unique forever). Not urgent until a create/renew-policy endpoint exists.
 - Validation error precedence — which error should win when a request violates more than one rule at once. Not a concern yet with only two independent checks in story 5, but worth a one-line convention once more rules stack up.
 
+## Authentication
+1. Client send POST to /api/auth/login with {username, password}
+- Public endpoints are POST api/auth/login, GET /actuator/health
+2. Server checks password against the BCrypt hash in the users table
+3. Server sends 200 with {accessToken, tokenType: "Bearer", expiresIn: 1800}
+- Token type is JWT signed by the server.
+- Lifetime is 30 minutes.
+4. Client sends GET to api/claims with header Authorization: Bearer <token>
+- Token contains username (sub), role, issued-at, expiry.
+- Contents of token are readable by anyone who has the token.
+5. Server verifies the token's signature and expiry to allow the request.
+- Note that refresh tokens and logout are out of scope.
+
 ## User Stories
 
 Seventeen stories in six phases. Each phase builds on the one before, so finish and test one before starting the next. Tick acceptance criteria as they pass.
@@ -144,13 +157,6 @@ properties through `ClaimSortField`, rejects anything else with `InvalidRequestE
 and appends `id` as a tiebreaker. `ClaimRepository` overrides the specification search with an `@EntityGraph` on
 `policy` to avoid one query per claim. The `submittedFrom`/`submittedTo` filters compare against `createdAt`,
 which the API calls `submittedAt`.
-
-Next session (deferred, not started):
-- Add more web-layer tests (`@WebMvcTest`) for the claim endpoints: exception paths, parameter binding edge cases,
-  and the `PageResponse` shape.
-- Seed a batch of about 25 test claims so the integration tests can confirm paging and sorting across several
-  pages (currently `ClaimListIntegrationTest` uses six claims, which can't show multi-page behaviour at the default
-  size of 20).
 
 Sample request payloads for manual testing live in `requests/` at the repo root (not under `src/`, since they're
 dev tooling, not part of the build).
