@@ -135,6 +135,18 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<environmentVariables>
+						<!-- Tests never touch real credentials; this just satisfies the
+						     ${JWT_SECRET} placeholder in application.yml so the Spring
+						     context can start. The real secret is supplied via .env/docker-compose. -->
+						<JWT_SECRET>dGVzdC1vbmx5LWp3dC1zZWNyZXQtZm9yLWF1dG9tYXRlZC10ZXN0cy4=</JWT_SECRET>
+					</environmentVariables>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
