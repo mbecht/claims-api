@@ -4,10 +4,12 @@ import com.mbecht.claims_api.dto.LoginResponse;
 import com.mbecht.claims_api.entity.Role;
 import com.mbecht.claims_api.entity.User;
 import com.mbecht.claims_api.repository.UserRepository;
+import com.mbecht.claims_api.security.TokenService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -51,6 +53,9 @@ class AuthIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
 
     @BeforeEach
     void seedUser() {
@@ -111,6 +116,25 @@ class AuthIntegrationTest {
         mockMvc.perform(get("/api/claims/999999").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CLAIM_NOT_FOUND"));
+    }
+
+    @Test
+    void claimsEndpoint_withMalformedToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/claims/999999").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-real-jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void claimsEndpoint_withExpiredToken_returns401() throws Exception {
+        // Same secret as the app's real TokenService, so the signature verifies fine - only the
+        // expiry (forced negative, so it expired the instant it was minted) should reject this.
+        TokenService expiredTokenService = new TokenService(jwtSecret, -10);
+        String expiredToken = expiredTokenService.generateToken("test.login.user", Role.POLICYHOLDER);
+
+        mockMvc.perform(get("/api/claims/999999").header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_REQUIRED"));
     }
 
     private static String loginRequestJson(String username, String password) {

@@ -61,6 +61,42 @@ $env:SPRING_PROFILES_ACTIVE = "dev"
   ./mvnw.cmd spring-boot:test-run
 ```
 
+## Login Authentication
+
+The following is a public path, so no token needed to call it. The request body contains the username and password
+
+```powershell
+  curl.exe -i -X POST http://localhost:8080/api/auth/login `
+    -H "Content-Type: application/json" `
+    -d "@requests/login.json"
+```
+
+A sample success response (200) will appear like this:
+
+```json
+  {
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZS5ob2xkZXIiLCJyb2xlIjoiUE9MSUNZSE9MREVSIiwiaWF0IjoxNzYwMDAwMDAwLCJleHAiOjE3NjAwMDE4MDB9.9f1c2a7b3d4e5f60718293a4b5c6d7e
+  8f90a1b2c3d4e5f60718293a4b5c6d7e",
+    "tokenType": "Bearer",
+    "expiresIn": 1800
+  }
+```
+
+A failed response (401) is indicative of `INVALID_CREDENTIALS` due to a wrong password or unknown username:
+
+```json
+  {
+    "type": "about:blank",
+    "title": "Unauthorized",
+    "status": 401,
+    "detail": "The username and/or password are not correct.",
+    "errorCode": "INVALID_CREDENTIALS",
+    "timestamp": "2026-10-08T18:05:00Z"
+  }
+```
+
+## API POST Endpoints
+
 The following POST body ([requests/submit-claim.json](requests/submit-claim.json)) references seed data in the dev profile:
 
 ```json
@@ -94,9 +130,6 @@ A valid POST will print response headers with 201 status and a body that verifie
 Users can read claims either by searching a specific ID or returning a list of all claims that accept optional filters. The goal of these endpoints is to demonstrate paging a large result set safely and effectively.
 
 Each query parameter will return 400 (`MALFORMED_REQUEST`) when entering the wrong data type (ex: status=1 or status=FOO). If the value is the correct type but outside the valid range, then it will return a 400 (`VALIDATION_FAILED`) code.
-
-> [!WARNING]
-> Authentication is not currently implemented. Until that time (user stories 7 and 8), anyone can read any claim.
 
 | Request | Behavior|
 |---|---|
@@ -157,6 +190,9 @@ All errors return a consistent JSON body following the [RFC 9457 Problem Details
 |---|:---:|---|---|
 | `VALIDATION_FAILED` | 400 | One or more fields are invalid; see `errors` | Negative claim amount; Sort field not in the allowed list |
 | `MALFORMED_REQUEST` | 400 | The request body, path or query value isn't valid JSON or has the wrong types | Text sent where a number is expected |
+| `INVALID_CREDENTIALS` | 401 | Login failed | Wrong password or unknown username with same message either way so a caller can't tell which |
+| `AUTHENTICATION_REQUIRED` | 401 | No valid bearer token on a protected endpoint | Missing, malformed, or expired Authorization header |
+| `ACCESS_DENIED` | 403 | Authenticated, but not allowed to do this | Reserved for story 8's role checks - nothing throws it yet |
 | `CLAIM_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown claim ID |
 | `POLICY_NOT_FOUND` | 404 | The requested item or URL doesn't exist | Unknown policy number |
 | `NO_SUCH_ENDPOINT` | 404 | The requested URL doesn't exist | Unknown URL |
@@ -185,7 +221,7 @@ See [docs/decisions](docs/decisions/) for the reasoning behind key choices.
 - [x] Claim submission
 - [x] Coverage validation
 - [x] View and search claims
-- [ ] Login with token
+- [x] Login with token
 - [ ] Role-based access
 - [ ] Enforce the claim lifecycle
 - [ ] Adjuster reviews
