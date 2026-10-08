@@ -2,6 +2,7 @@ package com.mbecht.claims_api.exception;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,9 +19,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Exercises every response shape GlobalExceptionHandler produces, through
  * ValidationTestController and ExceptionTestController, since no real
- * controller triggers these exceptions yet.
+ * controller triggers these exceptions yet. {@code addFilters = false} keeps SecurityConfig
+ * out of the way - see ClaimControllerTest's class comment for why it's otherwise needed.
  */
 @WebMvcTest(controllers = {ValidationTestController.class, ExceptionTestController.class})
+@AutoConfigureMockMvc(addFilters = false)
 class GlobalExceptionHandlerTest {
 
     @Autowired

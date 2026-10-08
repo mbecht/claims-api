@@ -11,6 +11,7 @@ import com.mbecht.claims_api.service.ClaimService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,9 +42,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Web slice test for ClaimController. The service layer is mocked, so these
  * tests only exercise HTTP concerns: request binding, validation, status
  * codes and response shape - not the claim submission business logic
- * (covered separately by ClaimsServiceTest).
+ * (covered separately by ClaimsServiceTest) and not SecurityConfig, which
+ * {@code addFilters = false} skips (a plain {@code @Configuration} class isn't one of the
+ * stereotypes {@code @WebMvcTest} scans, so without this these requests would run against
+ * Spring Boot's zero-config security default instead of ours, and every case here would see
+ * a 401/403 that has nothing to do with the thing each test is actually checking).
  */
 @WebMvcTest(ClaimController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ClaimControllerTest {
 
     @Autowired

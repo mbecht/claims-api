@@ -8,10 +8,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -25,23 +29,36 @@ import java.time.Instant;
  * verified bearer token. Unauthenticated/forbidden responses are shaped the same way as
  * every other error in this API (see GlobalExceptionHandler) because Spring Security rejects
  * requests before they ever reach a controller, so @RestControllerAdvice can't touch them.
+ * Also exposes the {@link PasswordEncoder} and {@link AuthenticationManager} beans the login
+ * endpoint authenticates against (AuthController -&gt; AuthService -&gt; AuthenticationManager -&gt;
+ * UserDetailsServiceImpl, which reads {@code users} via {@code UserRepository}).
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    JwtService jwtService(
+    TokenService tokenService(
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration-seconds}") long expirationSeconds) {
-        return new JwtService(secret, expirationSeconds);
+        return new TokenService(secret, expirationSeconds);
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService, ObjectMapper objectMapper)
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http, TokenService tokenService, ObjectMapper objectMapper)
             throws Exception {
 
-        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtService);
+        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(tokenService);
 
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

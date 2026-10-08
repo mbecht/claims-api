@@ -58,6 +58,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(problem);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidCredentials(InvalidCredentialsException ex) {
+        ProblemDetail problem = newProblemDetail(
+                HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS, "The username and/or password are not correct.");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
+    }
+
     // --- Anything not deliberately thrown by our own code ---
 
     @ExceptionHandler(Exception.class)

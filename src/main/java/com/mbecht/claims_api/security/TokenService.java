@@ -19,14 +19,14 @@ import java.util.Date;
  * {@code @WebMvcTest} slices only scan a narrow set of stereotypes, but they do process whatever
  * a Security {@code @Configuration} class itself defines, so this keeps the bean visible there too.
  */
-public class JwtService {
+public class TokenService {
 
     private static final String ROLE_CLAIM = "role";
 
     private final SecretKey key;
     private final long expirationSeconds;
 
-    public JwtService(String secret, long expirationSeconds) {
+    public TokenService(String secret, long expirationSeconds) {
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.expirationSeconds = expirationSeconds;
     }

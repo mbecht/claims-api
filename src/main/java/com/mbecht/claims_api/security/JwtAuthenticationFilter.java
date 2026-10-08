@@ -31,10 +31,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final JwtService jwtService;
+    private final TokenService tokenService;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
-        this.jwtService = jwtService;
+    public JwtAuthenticationFilter(TokenService tokenService) {
+        this.tokenService = tokenService;
     }
 
     @Override
@@ -47,9 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith(BEARER_PREFIX)) {
             String token = header.substring(BEARER_PREFIX.length());
             try {
-                Claims claims = jwtService.parseAndValidate(token);
-                String username = jwtService.extractUsername(claims);
-                Role role = jwtService.extractRole(claims);
+                Claims claims = tokenService.parseAndValidate(token);
+                String username = tokenService.extractUsername(claims);
+                Role role = tokenService.extractRole(claims);
 
                 List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
                 var authentication = new UsernamePasswordAuthenticationToken(username, null, authorities);
